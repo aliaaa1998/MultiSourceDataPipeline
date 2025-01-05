@@ -82,6 +82,4 @@ This data pipeline extracts data from three sources: a relational database, a RE
 - **Missing Libraries**: Reinstall dependencies using the `pip install` command.
 - **Data Merging Errors**: Ensure the `common_column` exists and matches across all data sources.
 
-## License
-This project is licensed under the MIT License. Feel free to use and modify as needed.
 
