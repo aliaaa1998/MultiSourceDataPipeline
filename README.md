@@ -1,85 +1,99 @@
 # MultiSourceDataPipeline
-# Data Pipeline README
 
-## Overview
-This data pipeline extracts data from three sources: a relational database, a REST API, and a CSV file. The data is cleaned, transformed, and then loaded into a Snowflake database.
+A Python ETL pipeline that extracts data from:
+- a SQL Server database,
+- a REST API,
+- and a CSV file,
 
-## Setup
+then transforms and loads the merged dataset into Snowflake.
 
-### Prerequisites
-- Python 3.8 or higher
-- Required Python libraries:
-  - `pandas`
-  - `sqlalchemy`
-  - `snowflake-connector-python`
-  - `snowflake-connector-pandas`
-  - `configparser`
-  - `requests`
-- Access to the following:
-  - Relational database (e.g., SQL Server)
-  - REST API endpoint
-  - Snowflake account
+## What was improved
 
-### Installation
-1. Clone this repository or download the code file.
-2. Install the required Python libraries using:
-   ```bash
-   pip install pandas sqlalchemy snowflake-connector-python snowflake-connector-pandas requests
-   ```
+- Added structured logging and clearer pipeline stages.
+- Added centralized configuration loading with validation.
+- Added safer API handling (`timeout`, `raise_for_status`).
+- Added merge-key validation for all sources before transformation.
+- Added better resource cleanup (`engine.dispose()` and Snowflake connection close).
+- Made key runtime options configurable through a new optional `[PIPELINE]` section.
 
-### Configuration
-1. Create a configuration file named `credentials.ini` in the root directory with the following structure:
+## Project files
 
-   ```ini
-   [DATABASE]
-   username = your_db_username
-   password = your_db_password
-   host = your_db_host
-   dbname = your_db_name
+- `SnowflakeETL.py`: main ETL script.
+- `credentials.ini` (you create this): credentials and pipeline options.
 
-   [API]
-   url = your_api_url
-   token = your_api_token
+## Requirements
 
-   [SNOWFLAKE]
-   user = your_snowflake_user
-   password = your_snowflake_password
-   account = your_snowflake_account
-   warehouse = your_snowflake_warehouse
-   database = your_snowflake_database
-   schema = your_snowflake_schema
-   ```
+- Python 3.8+
+- SQL Server ODBC driver (`ODBC Driver 17 for SQL Server`)
 
-2. Ensure that the CSV file is placed in the same directory as the code or specify its path in the `getFromCsv` function.
+Install Python packages:
 
-## Assumptions
-1. The common column name between the three data sources is `common_column`.
-2. The Snowflake table will be automatically created if it does not exist.
-3. Default values are used to fill missing data in the pipeline.
-4. Duplicate rows are removed from each data source before merging.
+```bash
+pip install pandas sqlalchemy pyodbc snowflake-connector-python requests
+```
 
-## How to Run the Pipeline
-1. Ensure all required dependencies are installed and the `credentials.ini` file is correctly configured.
-2. Run the Python script:
-   ```bash
-   python data_pipeline_sample.py
-   ```
-3. The pipeline will:
-   - Extract data from the relational database using a specified SQL query.
-   - Extract data from the REST API using the provided endpoint and token.
-   - Extract data from the CSV file.
-   - Transform the data by cleaning, deduplicating, and merging it.
-   - Load the transformed data into Snowflake.
-4. Check the console output for logs indicating the progress and success/failure of each step.
+## Configuration
 
-## Notes
-- Make sure to update the SQL query in the `main` function to match your requirements.
-- Ensure Snowflake credentials have the appropriate permissions to create tables and insert data.
-- Modify the column names and data structure as needed to align with your data schema.
+Create `credentials.ini` in the project root:
+
+```ini
+[DATABASE]
+username = your_db_username
+password = your_db_password
+host = your_db_host
+dbname = your_db_name
+
+[API]
+url = your_api_url
+token = your_api_token
+
+[SNOWFLAKE]
+user = your_snowflake_user
+password = your_snowflake_password
+account = your_snowflake_account
+warehouse = your_snowflake_warehouse
+database = your_snowflake_database
+schema = your_snowflake_schema
+
+[PIPELINE]
+# Optional values (shown with defaults)
+source_csv_path = data.csv
+merge_key = common_column
+target_table = table_name
+source_query = SELECT * FROM table1
+```
+
+## Run
+
+```bash
+python SnowflakeETL.py
+```
+
+## Data flow
+
+1. **Extract**
+   - DB query from `[PIPELINE].source_query`
+   - API call using bearer token
+   - CSV read from `[PIPELINE].source_csv_path`
+2. **Transform**
+   - Fill missing values with `default_value`
+   - Remove duplicate rows per source
+   - Inner-join all three sources on `[PIPELINE].merge_key`
+3. **Load**
+   - Write merged dataframe to Snowflake table `[PIPELINE].target_table`
+   - Auto-create the Snowflake table if needed
 
 ## Troubleshooting
-- **Connection Issues**: Verify that your credentials in `credentials.ini` are correct.
-- **Missing Libraries**: Reinstall dependencies using the `pip install` command.
-- **Data Merging Errors**: Ensure the `common_column` exists and matches across all data sources.
 
-
+- **`Configuration file not found`**
+  - Ensure `credentials.ini` exists in the repository root.
+- **`Missing required config section(s)`**
+  - Confirm `[DATABASE]`, `[API]`, and `[SNOWFLAKE]` sections are present.
+- **Merge key errors**
+  - Ensure the configured `merge_key` exists in all three datasets.
+- **SQL Server connection issues**
+  - Verify DB host/name/user/password and ensure ODBC Driver 17 is installed.
+- **API failures**
+  - Check API URL/token and verify endpoint availability.
+- **Snowflake load failures**
+  - Confirm Snowflake credentials, permissions, and target warehouse/database/schema.
